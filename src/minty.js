@@ -1,7 +1,7 @@
 const fs = require("fs").promises
 const path = require('path')
 
-const CID = require('cids')
+const { CID } = require('multiformats/cid')
 const { create: createIpfsClient } = require('ipfs-http-client')
 const all = require('it-all')
 const uint8ArrayConcat = require('uint8arrays/concat')
@@ -434,7 +434,7 @@ class Minty {
      */
     async isPinned(cid) {
         if (typeof cid === 'string') {
-            cid = new CID(cid)
+            cid = CID(cid)
         }
 
         const opts = {
@@ -526,7 +526,7 @@ function makeGatewayURL(ipfsURI) {
 function extractCID(cidOrURI) {
     // remove the ipfs:// prefix, split on '/' and return first path component (root CID)
     const cidString = stripIpfsUriPrefix(cidOrURI).split('/')[0]
-    return new CID(cidString)
+    return CID.parse(cidString)
 }
 
 
