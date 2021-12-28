@@ -106,7 +106,18 @@ class Minty {
         // 'ipfs://QmaNZ2FCgvBPqnxtkbToVVbK2Nes6xk5K4Ns6BsmkPucAM/cat-pic.png' instead of
         // 'ipfs://QmaNZ2FCgvBPqnxtkbToVVbK2Nes6xk5K4Ns6BsmkPucAM'
         const ipfsPath = '/nft/' + basename
+        console.log(`asset path: ${ipfsPath}`)
         const { cid: assetCid } = await this.ipfs.add({ path: ipfsPath, content }, ipfsAddOptions)
+
+        if (options.animation) {
+            const aniContent = await fs.readFile(options.animation)
+            const aniBasename = path.basename(options.animation)
+            const aniPath = '/nft/' + aniBasename
+            console.log(`animation path: ${aniPath}`)
+            const { cid: animationCid } = await this.ipfs.add({ path: aniPath, content: aniContent }, ipfsAddOptions)
+            options.animation_url = ensureIpfsUriPrefix(animationCid) + '/' + aniBasename
+            console.log(`Uploaded ${options.animation} as ${options.animation_url} (${aniContent.length} bytes)`)
+        }
 
         // make the NFT metadata JSON
         const assetURI = ensureIpfsUriPrefix(assetCid) + '/' + basename
@@ -116,7 +127,21 @@ class Minty {
         const { cid: metadataCid } = await this.ipfs.add({ path: '/nft/metadata.json', content: JSON.stringify(metadata)}, ipfsAddOptions)
         const metadataURI = ensureIpfsUriPrefix(metadataCid) + '/metadata.json'
 
-        // get the address of the token owner from options, or use the default signing address if no owner is given
+        const nft = await this.createNFTFromMetadataURI(metadataURI, options)
+
+        // format and return the results
+        return {
+            tokenId: nft.tokenId,
+            ownerAddress: nft.ownerAddress,
+            metadata,
+            assetURI,
+            metadataURI,
+            assetGatewayURL: makeGatewayURL(assetURI),
+            metadataGatewayURL: makeGatewayURL(metadataURI),
+        }
+    }
+
+    async createNFTFromMetadataURI(metadataURI, options) {
         let ownerAddress = options.owner
         if (!ownerAddress) {
             ownerAddress = await this.defaultOwnerAddress()
@@ -124,16 +149,9 @@ class Minty {
 
         // mint a new token referencing the metadata URI
         const tokenId = await this.mintToken(ownerAddress, metadataURI)
-
-        // format and return the results
         return {
             tokenId,
             ownerAddress,
-            metadata,
-            assetURI,
-            metadataURI,
-            assetGatewayURL: makeGatewayURL(assetURI),
-            metadataGatewayURL: makeGatewayURL(metadataURI),
         }
     }
 
@@ -165,11 +183,20 @@ class Minty {
     async makeNFTMetadata(assetURI, options) {
         const {name, description} = options;
         assetURI = ensureIpfsUriPrefix(assetURI)
-        return {
+        let metadata = {
             name,
             description,
-            image: assetURI
+            image: assetURI,
+            attributes: [{
+                display_type: "date",
+                trait_type: "wedding",
+                value: 1640347200
+            }]
         }
+        if (options.animation_url) {
+            metadata.animation_url = options.animation_url
+        }
+        return metadata
     }
 
     //////////////////////////////////////////////
@@ -390,10 +417,15 @@ class Minty {
      */
     async pinTokenData(tokenId) {
         const {metadata, metadataURI} = await this.getNFTMetadata(tokenId)
-        const {image: assetURI} = metadata
+        const {image: assetURI, animation_url: animationURI} = metadata
         
         console.log(`Pinning asset data (${assetURI}) for token id ${tokenId}....`)
         await this.pin(assetURI)
+
+        if (animationURI) {
+            console.log(`Pinning animation data (${animationURI}) for token id ${tokenId}....`)
+            await this.pin(animationURI)
+        }
 
         console.log(`Pinning metadata (${metadataURI}) for token id ${tokenId}...`)
         await this.pin(metadataURI)

@@ -29,9 +29,17 @@ async function main() {
         .description('create a new NFT from an image file')
         .option('-n, --name <name>', 'The name of the NFT')
         .option('-d, --description <desc>', 'A description of the NFT')
+        .option('-a, --animation <file>', 'Additional animation (i.e. video) file to upload and attach')
         .option('-o, --owner <address>', 'The ethereum address that should own the NFT.' +
             'If not provided, defaults to the first signing address.')
         .action(createNFT)
+
+    program
+        .command('mint-with-metadata <metadata-url>')
+        .description('create a new NFT with a given metadata url')
+        .option('-o, --owner <address>', 'The ethereum address that should own the NFT.' +
+            'If not provided, defaults to the first signing address.')
+        .action(createNFTfromMetadata)
 
     program.command('show <token-id>')
         .description('get info about an NFT using its token ID')
@@ -66,6 +74,17 @@ async function main() {
 
 // ---- command action functions
 
+async function createNFTfromMetadata(metadata, options) {
+    const minty = await MakeMinty()
+
+    const nft = await minty.createNFTFromMetadataURI(metadata, options)
+    console.log('🌿 Minted a new NFT: ')
+    alignOutput([
+        ['Token ID:', chalk.green(nft.tokenId)],
+        ['Metadata Address:', chalk.blue(metadata)],
+    ])
+}
+
 async function createNFT(imagePath, options) {
     const minty = await MakeMinty()
 
@@ -80,7 +99,7 @@ async function createNFT(imagePath, options) {
         }
     })
 
-    const nft = await minty.createNFTFromAssetFile(imagePath, answers)
+    const nft = await minty.createNFTFromAssetFile(imagePath, {...options, ...answers})
     console.log('🌿 Minted a new NFT: ')
 
     alignOutput([
